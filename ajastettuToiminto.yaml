@@ -1,0 +1,57 @@
+blueprint:
+  name: Timed Switch Control
+  description: Automate turning off a switch after a set timer
+  domain: automation
+  input:
+    switch_entity:
+      name: Switch
+      description: The switch to be controlled
+      selector:
+        entity:
+          domain: switch
+    timer_entity:
+      name: Timer
+      description: Input number for setting the timer duration in minutes
+      selector:
+        entity:
+          domain: input_number
+    timer_control_entity:
+      name: Timer Control
+      description: Input boolean to control the timer activation
+      selector:
+        entity:
+          domain: input_boolean
+
+variables:
+  switch_entity: !input switch_entity
+  timer_entity: !input timer_entity
+  timer_control_entity: !input timer_control_entity
+
+sensor:
+  - platform: template
+    sensors:
+      timed_switch_timer_remaining:
+        friendly_name: "{{ switch_entity.name }} Timer Remaining"
+        value_template: >
+          {% if is_state(switch_entity, 'on') %}
+            {{ [ (states(timer_entity)|int - (as_timestamp(now()) - as_timestamp(states[switch_entity].last_changed)) / 60)|round(0) ,0 ]|max }}
+          {% else %}
+            0
+          {% endif %}
+        unit_of_measurement: "min"
+
+trigger:
+  - platform: numeric_state
+    entity_id: sensor.timed_switch_timer_remaining
+    below: 1
+
+condition:
+  - condition: state
+    entity_id: "{{ timer_control_entity }}"
+    state: 'on'
+
+action:
+  - service: switch.turn_off
+    entity_id: "{{ switch_entity }}"
+
+mode: single
